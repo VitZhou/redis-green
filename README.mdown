@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/VitZhou/redis-green.svg?branch=dev)](https://travis-ci.com/VitZhou/redis-green)
+[![Build Status](https://travis-ci.com/VitZhou/redis-green.svg?branch=master)](https://travis-ci.com/VitZhou/redis-green)
 
 
 Redis Mesh
