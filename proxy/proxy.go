@@ -6,7 +6,7 @@ import (
 	"io"
 	"fmt"
 	"os"
-	"redis-green/proxy/protocol"
+	"github.com/VitZhou/redis-green/proxy/protocol"
 )
 
 type Proxy struct {
