@@ -1,5 +1,8 @@
 language: go
 sudo: required
+notifications:
+  email:
+    - vitzhou@gmail.com
 before_install:
   - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
   - dep ensure
