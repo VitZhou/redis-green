@@ -1,0 +1,15 @@
+vendor/
+*.log
+*/*.log
+*.lock
+cli/envoy
+
+### IntelliJ IDEA ###
+.idea
+.mvn
+*.iws
+*.iml
+*.ipr
+
+
+

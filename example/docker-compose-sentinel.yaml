@@ -1,0 +1,22 @@
+version: "3"
+services:
+  redis-master:
+    image: redis:4.0.10
+    volumes:
+      - ./redis.config:/usr/local/etc/redis/redis.conf
+    ports:
+      - 6379:6379
+  redis-slave:
+    image: redis:4.0.10
+    volumes:
+      - ./redis.config:/usr/local/etc/redis/redis.conf
+    ports:
+      - 6381:6379
+  sentinal:
+    image: redis:4.0.10
+    volumes:
+      - ./sentinal.config:/usr/local/etc/redis/redis.conf
+    ports:
+      - 26379:26379
+    command: ["redis-sentinel","/usr/local/etc/redis/redis.conf"]
+
