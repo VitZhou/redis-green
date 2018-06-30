@@ -6,7 +6,7 @@ import (
 	"io"
 	"fmt"
 	"os"
-	"github.com/VitZhou/redis-green/proxy/protocol"
+	"redis-green/proxy/protocol"
 	"redis-green/proxy/pool"
 )
 
