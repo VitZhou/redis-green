@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"os"
 	"github.com/VitZhou/redis-green/proxy/protocol"
+	"redis-green/proxy/pool"
 )
 
 type Proxy struct {
-	targetConn net.Conn
+	pool *pool.ConnPool
 }
 
 func NewSocketProxy() {
@@ -18,6 +19,14 @@ func NewSocketProxy() {
 	CheckError(e)
 	defer listener.Close()
 	log.Println("tcp server started on port 20880 waitting for clients")
+	opt := &pool.Options{
+		Address: ":6379",
+	}
+	connPool, i := pool.NewConnPool(opt)
+	if i != nil {
+		log.Fatal("init fail", i)
+	}
+	proxy := &Proxy{pool: connPool}
 	for {
 		conn, i := listener.Accept()
 
@@ -25,13 +34,13 @@ func NewSocketProxy() {
 			continue
 		}
 		reader := protocol.NewRESPReader(conn)
-		proxy := &Proxy{}
+
 		go proxy.forward(reader, conn)
 	}
 }
 
 func (p *Proxy) forward(reader *protocol.RESPReader, clientConn net.Conn) {
-	targetConn, e := p.getTargetConn()
+	targetConn, e := p.pool.Get()
 	if e != nil {
 		log.Fatal("remote targetConn failed:", e)
 	}
@@ -44,27 +53,17 @@ func (p *Proxy) forward(reader *protocol.RESPReader, clientConn net.Conn) {
 				if err == io.EOF {
 					clientConn.Close()
 					//客户端连接断开后,向targetConn写入一个字节,以便targetConn退出io.copy
-					targetConn.Write([]byte{1})
+					targetConn.NetConn.Write([]byte{1})
 					return
 				}
 			}
 			log.Print("##########", string(bytes))
-			targetConn.Write(bytes)
+			targetConn.NetConn.Write(bytes)
 		}
 	}()
-	go io.Copy(clientConn, targetConn)
+	go io.Copy(clientConn, targetConn.NetConn)
 }
 
-func (p *Proxy) getTargetConn() (net.Conn, error) {
-	if p.targetConn == nil {
-		dial, e := net.Dial("tcp", ":6379")
-		if dial == nil || e != nil {
-			return nil, e
-		}
-		p.targetConn = dial
-	}
-	return p.targetConn, nil
-}
 
 func CheckError(err error) {
 	if err != nil {

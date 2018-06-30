@@ -58,7 +58,7 @@ func (pool *ConnPool) NewConn() (*Conn, error) {
 	if e != nil {
 		return nil, e
 	}
-	conn := &Conn{netConn: dialer}
+	conn := &Conn{NetConn: dialer}
 	pool.idleConns = append(pool.idleConns, conn)
 	pool.idleConnsMu.Unlock()
 	return conn, nil
@@ -69,7 +69,7 @@ func (pool *ConnPool) CloseConn(conn *Conn) error {
 		return AlreadyClosed
 	}
 	pool.removeConn(conn)
-	return conn.netConn.Close()
+	return conn.NetConn.Close()
 }
 
 func (pool *ConnPool) Get() (*Conn, error) {
@@ -94,7 +94,7 @@ func (pool *ConnPool) Close() error {
 	var closeConnErr error
 	pool.runningConnsMu.Lock()
 	for _, cn := range pool.runningConns {
-		if err := cn.netConn.Close(); err != nil && closeConnErr == nil {
+		if err := cn.NetConn.Close(); err != nil && closeConnErr == nil {
 			closeConnErr = err
 		}
 	}
@@ -103,7 +103,7 @@ func (pool *ConnPool) Close() error {
 
 	pool.idleConnsMu.Lock()
 	for _, cn := range pool.idleConns {
-		if err := cn.netConn.Close(); err != nil && closeConnErr == nil {
+		if err := cn.NetConn.Close(); err != nil && closeConnErr == nil {
 			closeConnErr = err
 		}
 	}

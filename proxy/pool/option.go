@@ -26,6 +26,9 @@ type Options struct {
 }
 
 func (opt *Options) init() {
+	if opt.DialTimeout == 0 {
+		opt.DialTimeout = 10 * time.Second
+	}
 	opt.dialer = func() (net.Conn, error) {
 		conn, e := net.DialTimeout("tcp", opt.Address, opt.DialTimeout)
 		if e != nil {
@@ -43,9 +46,7 @@ func (opt *Options) init() {
 	if opt.MaxPoolSize == 0 {
 		opt.MaxPoolSize = 10
 	}
-	if opt.DialTimeout == 0 {
-		opt.DialTimeout = 10 * time.Second
-	}
+
 	if opt.IdleTimeout == 0 {
 		opt.IdleTimeout = 5 * time.Minute
 	}
