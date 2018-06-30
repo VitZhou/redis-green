@@ -82,7 +82,7 @@ func (pool *ConnPool) Get() (*Conn, error) {
 	}
 	pool.runningConnsMu.Lock()
 	defer pool.runningConnsMu.Unlock()
-	_ := append(pool.runningConns, idle)
+	_ = append(pool.runningConns, idle)
 	return idle, nil
 }
 
