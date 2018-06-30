@@ -3,5 +3,7 @@ language: go
 go:
   - "1.10.x"
   - dev
-script: dep ensure
+before_install:
+  - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+  - dep ensure
 script: go test ./...
