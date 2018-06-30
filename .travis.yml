@@ -1,6 +1,5 @@
 language: go
 sudo: required
-go_import_path: redis-green
 notifications:
   email: false
 before_install:

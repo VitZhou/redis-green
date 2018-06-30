@@ -6,8 +6,8 @@ import (
 	"io"
 	"fmt"
 	"os"
-	"redis-green/proxy/protocol"
-	"redis-green/proxy/pool"
+	"github.com/VitZhou/redis-green/proxy/protocol"
+	"github.com/VitZhou/redis-green/proxy/pool"
 )
 
 type Proxy struct {

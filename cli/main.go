@@ -1,7 +1,7 @@
 package main
 
 import (
-	"redis-green/proxy"
+	"github.com/VitZhou/redis-green/proxy"
 	"log"
 )
 
