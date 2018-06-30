@@ -1,4 +1,4 @@
 [![Build Status](https://travis-ci.com/VitZhou/redis-green.svg?branch=master)](https://travis-ci.com/VitZhou/redis-green)
-
+[![Coverage Status](https://coveralls.io/repos/github/VitZhou/redis-green/badge.svg?branch=master)](https://coveralls.io/github/VitZhou/redis-green?branch=master)
 
 Redis Mesh
