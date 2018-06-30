@@ -120,3 +120,23 @@ func TestGetCount(t *testing.T) {
 	})
 }
 
+func TestReadArray(t *testing.T)  {
+	t.Run("读取正确报文", func(t *testing.T) {
+		server, client := net.Pipe()
+		defer client.Close()
+		defer server.Close()
+
+		go func() {
+			reader := NewRESPReader(server)
+			bytes, e := reader.ReadObject()
+			if e != nil{
+				t.Errorf("读取数组失败")
+			}
+			if bytes2.Compare(bytes, []byte("*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$8\r\nmy value\r\n")) != 0{
+				t.Errorf("aaa")
+			}
+		}()
+		client.Write([]byte("*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$8\r\nmy value\r\n"))
+	})
+}
+

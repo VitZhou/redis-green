@@ -54,7 +54,7 @@ func (r *RESPReader) ReadObject() ([]byte, error) {
 // 解析本文长度
 func (r *RESPReader) getCount(line []byte) (int, error) {
 	end := bytes.IndexByte(line, '\r')
-	if end == -1 {
+	if end < 0 {
 		return 0, fmt.Errorf("proto err")
 	}
 	return strconv.Atoi(string(line[1:end]))
@@ -80,9 +80,6 @@ func (r *RESPReader) readBulkString(line []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if count == -1 {
-		return line, nil
-	}
 	buf := make([]byte, len(line)+count+2)
 	copy(buf, line)
 	_, err = io.ReadFull(r.src, buf[len(line):])
@@ -101,5 +98,4 @@ func (r *RESPReader) readLine() ([]byte, error) {
 		return line, nil
 	}
 	return nil, ErrInvalidSyntax
-
-	}
+}
