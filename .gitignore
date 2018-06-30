@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 vendor/
 *.log
 */*.log
@@ -12,9 +11,6 @@ cli/envoy
 *.iml
 *.ipr
 
-
-
-=======
 # Binaries for programs and plugins
 *.exe
 *.exe~
@@ -27,4 +23,3 @@ cli/envoy
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
->>>>>>> e119b3dfc7d64796688229bd8e873f03172d8e65

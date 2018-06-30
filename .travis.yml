@@ -1,0 +1,7 @@
+language: go
+
+go:
+  - "1.10.x"
+  - dev
+script: dep ensure
+script: go test ./...
