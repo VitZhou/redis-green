@@ -4,10 +4,12 @@ import (
 	"sync"
 	"sync/atomic"
 	"errors"
+	"time"
+	"log"
 )
 
 var AlreadyClosed = errors.New("mesh: pool is closed")
-var PoolFull = errors.New("mesh: pool is full")
+var poolFull = errors.New("mesh: pool is full")
 var NoIdle = errors.New("mesh: no idle conn")
 
 type Pool interface {
@@ -41,25 +43,30 @@ func NewConnPool(opt *Options) (*ConnPool, error) {
 			return pool, e
 		}
 	}
+	pool.initIdleCheckTicker(opt.IdleCheckFrequency)
 	return pool, nil
 }
 
 func (pool *ConnPool) NewConn() (*Conn, error) {
+	log.Printf("create conn")
 	if atomic.LoadInt32(&pool.connNum) >= pool.opt.MaxPoolSize {
-		return nil, PoolFull
+		return nil, poolFull
 	}
 	atomic.AddInt32(&pool.connNum, 1)
 
 	if pool.isClosed() {
 		return nil, AlreadyClosed
 	}
+
 	pool.idleConnsMu.Lock()
 	defer pool.idleConnsMu.Unlock()
+
 	dialer, e := pool.opt.dialer()
 	if e != nil {
 		return nil, e
 	}
 	conn := &Conn{NetConn: dialer}
+	conn.UpdateLastUseTime()
 	pool.idleConns = append(pool.idleConns, conn)
 	return conn, nil
 }
@@ -78,7 +85,7 @@ func (pool *ConnPool) Get() (*Conn, error) {
 	}
 	idle := pool.popIdle()
 	if idle == nil {
-		return nil, NoIdle
+		return pool.NewConn()
 	}
 	pool.runningConnsMu.Lock()
 	defer pool.runningConnsMu.Unlock()
@@ -154,4 +161,37 @@ func (pool *ConnPool) removeConn(conn *Conn) {
 		}
 		pool.runningConnsMu.Unlock()
 	}
+}
+
+func (pool *ConnPool) initIdleCheckTicker(idleCheckFrequency time.Duration) {
+	go func() {
+		tick := time.NewTicker(idleCheckFrequency)
+		defer tick.Stop()
+		for range tick.C {
+			if pool.isClosed() {
+				return
+			}
+			pool.checkIdle()
+		}
+	}()
+}
+
+func (pool *ConnPool) checkIdle() {
+	pool.idleConnsMu.Lock()
+	if len(pool.idleConns) > 0 && pool.idleConns[0].IsExpired(pool.opt.IdleTimeout) {
+		log.Printf("delete idle conn")
+		pool.idleConns = append(pool.idleConns[:0], pool.idleConns[1:]...)
+		atomic.AddInt32(&pool.connNum, -1)
+	}
+	pool.idleConnsMu.Unlock()
+
+	pool.runningConnsMu.Lock()
+	for i, conn := range pool.runningConns {
+		if conn.IsExpired(pool.opt.IdleTimeout) {
+			log.Printf("delete running conn")
+			pool.runningConns = append(pool.runningConns[:i], pool.runningConns[i+1:]...)
+			atomic.AddInt32(&pool.connNum, -1)
+		}
+	}
+	pool.runningConnsMu.Unlock()
 }

@@ -53,7 +53,6 @@ func (opt *Options) init() {
 	if opt.MaxPoolSize == 0 {
 		opt.MaxPoolSize = 10
 	}
-
 	if opt.IdleTimeout == 0 {
 		opt.IdleTimeout = 5 * time.Minute
 	}

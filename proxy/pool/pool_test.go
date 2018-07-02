@@ -44,7 +44,7 @@ func TestConnPool_NewConn(t *testing.T) {
 		connPool, _ := NewConnPool(opt)
 
 		conn, e := connPool.NewConn()
-		assert.Equal(t, PoolFull, e)
+		assert.Equal(t, poolFull, e)
 		assert.Nil(t, conn)
 	})
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"github.com/VitZhou/redis-green/proxy/protocol"
 	"github.com/VitZhou/redis-green/proxy/pool"
+	"time"
 )
 
 type Proxy struct {
@@ -20,7 +21,9 @@ func NewSocketProxy() {
 	defer listener.Close()
 	log.Println("tcp server started on port 20880 waitting for clients")
 	opt := &pool.Options{
-		Address: ":6379",
+		Address:            ":6379",
+		IdleCheckFrequency: time.Second,
+		IdleTimeout:        2 * time.Second,
 	}
 	connPool, i := pool.NewConnPool(opt)
 	if i != nil {
@@ -46,24 +49,22 @@ func (p *Proxy) forward(reader *protocol.RESPReader, clientConn net.Conn) {
 	}
 	go func() {
 		for {
-			//buf := make([]byte, 2048)
-			//clientConn.Read(buf)
 			bytes, err := reader.ReadObject()
+			conn := targetConn.NetConn
 			if err != nil {
 				if err == io.EOF {
 					clientConn.Close()
 					//客户端连接断开后,向targetConn写入一个字节,以便targetConn退出io.copy
-					targetConn.NetConn.Write([]byte{1})
+					conn.Write([]byte{1})
 					return
 				}
 			}
 			log.Print("##########", string(bytes))
-			targetConn.NetConn.Write(bytes)
+			conn.Write(bytes)
 		}
 	}()
 	go io.Copy(clientConn, targetConn.NetConn)
 }
-
 
 func CheckError(err error) {
 	if err != nil {
