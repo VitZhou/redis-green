@@ -6,6 +6,9 @@ import (
 	"crypto/tls"
 )
 
+type Option interface {
+}
+
 type Options struct {
 	dialer  func() (net.Conn, error)
 	OnClose func(*Conn) error
@@ -14,7 +17,7 @@ type Options struct {
 	Pwd                string
 	DbIndex            int
 	InitialPoolSize    int
-	MaxPoolSize        uint32
+	MaxPoolSize        int32
 	PoolTimeout        time.Duration
 	DialTimeout        time.Duration
 	IdleTimeout        time.Duration
@@ -29,17 +32,21 @@ func (opt *Options) init() {
 	if opt.DialTimeout == 0 {
 		opt.DialTimeout = 10 * time.Second
 	}
-	opt.dialer = func() (net.Conn, error) {
-		conn, e := net.DialTimeout("tcp", opt.Address, opt.DialTimeout)
-		if e != nil {
-			return nil, e
+
+	if opt.dialer == nil {
+		opt.dialer = func() (net.Conn, error) {
+			conn, e := net.DialTimeout("tcp", opt.Address, opt.DialTimeout)
+			if e != nil {
+				return nil, e
+			}
+			if opt.TlsConfig != nil {
+				t := tls.Client(conn, opt.TlsConfig)
+				return t, t.Handshake()
+			}
+			return conn, nil
 		}
-		if opt.TlsConfig != nil {
-			t := tls.Client(conn, opt.TlsConfig)
-			return t, t.Handshake()
-		}
-		return conn, nil
 	}
+
 	if opt.InitialPoolSize == 0 {
 		opt.InitialPoolSize = 1
 	}

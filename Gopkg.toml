@@ -24,6 +24,11 @@
 #   go-tests = true
 #   unused-packages = true
 
+
+[[constraint]]
+  name = "github.com/stretchr/testify"
+  revision ="v1.2.2"
+
 [[constraint]]
   name = "github.com/go-redis/redis"
   revision ="v6.12.0"
