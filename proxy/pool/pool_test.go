@@ -81,7 +81,7 @@ func TestConnPool_Get(t *testing.T) {
 
 		_, _ = connPool.Get()
 		_, e := connPool.Get()
-		assert.Equal(t, e, NoIdle)
+		assert.Equal(t, e, poolFull)
 	})
 
 	t.Run("连接池已关闭,无法获取", func(t *testing.T) {
