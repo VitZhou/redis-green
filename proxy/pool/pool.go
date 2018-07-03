@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 	"log"
+	"fmt"
 )
 
 var AlreadyClosed = errors.New("mesh: pool is closed")
@@ -27,8 +28,9 @@ type ConnPool struct {
 	runningConns   []*Conn
 	runningConnsMu sync.Mutex
 
-	connNum    int32 //atomic
-	closedFlag int32 //atomic
+	connNum     int32 //atomic
+	idleConnNum int32 //atomic
+	closedFlag  int32 //atomic
 }
 
 func NewConnPool(opt *Options) (*ConnPool, error) {
@@ -52,22 +54,21 @@ func (pool *ConnPool) NewConn() (*Conn, error) {
 	if atomic.LoadInt32(&pool.connNum) >= pool.opt.MaxPoolSize {
 		return nil, poolFull
 	}
-	atomic.AddInt32(&pool.connNum, 1)
-
 	if pool.isClosed() {
 		return nil, AlreadyClosed
 	}
 
 	pool.idleConnsMu.Lock()
 	defer pool.idleConnsMu.Unlock()
-
 	dialer, e := pool.opt.dialer()
 	if e != nil {
 		return nil, e
 	}
 	conn := &Conn{NetConn: dialer}
-	conn.UpdateLastUseTime()
+	conn.UpdateLastUseTime(time.Now())
 	pool.idleConns = append(pool.idleConns, conn)
+	atomic.AddInt32(&pool.idleConnNum, 1)
+	atomic.AddInt32(&pool.connNum, 1)
 	return conn, nil
 }
 
@@ -83,14 +84,21 @@ func (pool *ConnPool) Get() (*Conn, error) {
 	if pool.isClosed() {
 		return nil, AlreadyClosed
 	}
-	idle := pool.popIdle()
-	if idle == nil {
-		return pool.NewConn()
+
+	var idle *Conn
+	var err error
+	if atomic.LoadInt32(&pool.idleConnNum) <= 0 {
+		idle, err = pool.NewConn()
+	} else {
+		idle = pool.popIdle()
 	}
-	pool.runningConnsMu.Lock()
-	defer pool.runningConnsMu.Unlock()
-	pool.runningConns = append(pool.runningConns, idle)
-	return idle, nil
+
+	if err == nil {
+		pool.runningConnsMu.Lock()
+		pool.runningConns = append(pool.runningConns, idle)
+		pool.runningConnsMu.Unlock()
+	}
+	return idle, err
 }
 
 func (pool *ConnPool) Close() error {
@@ -117,6 +125,7 @@ func (pool *ConnPool) Close() error {
 	pool.idleConns = nil
 	pool.idleConnsMu.Unlock()
 	atomic.StoreInt32(&pool.connNum, 0)
+	atomic.StoreInt32(&pool.idleConnNum, 0)
 	return closeConnErr
 }
 
@@ -125,16 +134,13 @@ func (pool *ConnPool) isClosed() bool {
 }
 
 func (pool *ConnPool) popIdle() *Conn {
-	if len(pool.idleConns) == 0 {
-		return nil
-	}
-
 	pool.idleConnsMu.Lock()
 	defer pool.idleConnsMu.Unlock()
 	idx := len(pool.idleConns) - 1
-	cn := pool.idleConns[idx]
+	conn := pool.idleConns[idx]
 	pool.idleConns = pool.idleConns[:idx]
-	return cn
+	atomic.AddInt32(&pool.idleConnNum, -1)
+	return conn
 }
 
 func (pool *ConnPool) removeConn(conn *Conn) {
@@ -145,21 +151,14 @@ func (pool *ConnPool) removeConn(conn *Conn) {
 			pool.idleConns = append(pool.idleConns[:i], pool.idleConns[i+1:]...)
 			removed = true
 			atomic.AddInt32(&pool.connNum, -1)
+			atomic.AddInt32(&pool.idleConnNum, -1)
 			break
 		}
 	}
 	pool.idleConnsMu.Unlock()
 
 	if !removed {
-		pool.runningConnsMu.Lock()
-		for i, c := range pool.runningConns {
-			if c == conn {
-				pool.runningConns = append(pool.runningConns[:i], pool.runningConns[i+1:]...)
-				atomic.AddInt32(&pool.connNum, -1)
-				break
-			}
-		}
-		pool.runningConnsMu.Unlock()
+		pool.removeIdleConn(conn)
 	}
 }
 
@@ -179,18 +178,64 @@ func (pool *ConnPool) initIdleCheckTicker(idleCheckFrequency time.Duration) {
 func (pool *ConnPool) checkIdle() {
 	pool.idleConnsMu.Lock()
 	if len(pool.idleConns) > 0 && pool.idleConns[0].IsExpired(pool.opt.IdleTimeout) {
-		log.Printf("delete idle conn")
 		pool.idleConns = append(pool.idleConns[:0], pool.idleConns[1:]...)
 		atomic.AddInt32(&pool.connNum, -1)
+		atomic.AddInt32(&pool.idleConnNum, -1)
 	}
 	pool.idleConnsMu.Unlock()
 
 	pool.runningConnsMu.Lock()
 	for i, conn := range pool.runningConns {
-		if conn.IsExpired(pool.opt.IdleTimeout) {
-			log.Printf("delete running conn")
+		if len(pool.idleConns) > 0 &&  conn.IsExpired(pool.opt.IdleTimeout) {
 			pool.runningConns = append(pool.runningConns[:i], pool.runningConns[i+1:]...)
 			atomic.AddInt32(&pool.connNum, -1)
+		}
+	}
+	pool.runningConnsMu.Unlock()
+}
+
+func (pool *ConnPool) Size() int32 {
+	return atomic.LoadInt32(&pool.connNum)
+}
+
+func (pool *ConnPool) Idle(conn *Conn) {
+	pool.runningConnsMu.Lock()
+	for i, c := range pool.runningConns {
+		if c == conn {
+			pool.runningConns = append(pool.runningConns[:i], pool.runningConns[i+1:]...)
+			break
+		}
+	}
+	pool.runningConnsMu.Unlock()
+
+	pool.idleConnsMu.Lock()
+	pool.idleConns = append(pool.idleConns, conn)
+	atomic.AddInt32(&pool.idleConnNum, 1)
+	pool.idleConnsMu.Unlock()
+	fmt.Println("num:", atomic.LoadInt32(&pool.connNum))
+	fmt.Println("pool.idleConns:", atomic.LoadInt32(&pool.idleConnNum))
+}
+
+func (pool *ConnPool) removeIdleConn(conn *Conn) {
+	pool.idleConnsMu.Lock()
+	for i, c := range pool.idleConns {
+		if c == conn {
+			pool.idleConns = append(pool.idleConns[:i], pool.idleConns[i+1:]...)
+			atomic.AddInt32(&pool.connNum, -1)
+			atomic.AddInt32(&pool.idleConnNum, -1)
+			break
+		}
+	}
+	pool.idleConnsMu.Unlock()
+}
+
+func (pool *ConnPool) removeRunningConn(conn *Conn) {
+	pool.runningConnsMu.Lock()
+	for i, c := range pool.runningConns {
+		if c == conn {
+			pool.runningConns = append(pool.runningConns[:i], pool.runningConns[i+1:]...)
+			atomic.AddInt32(&pool.connNum, -1)
+			break
 		}
 	}
 	pool.runningConnsMu.Unlock()

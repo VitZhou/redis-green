@@ -14,6 +14,7 @@ type Conn struct {
 }
 
 func (cn *Conn) SetWriteTimeout(timeout time.Duration) {
+	cn.UpdateLastUseTime(time.Now())
 	if timeout <= 0 {
 		cn.NetConn.SetWriteDeadline(noTimeout)
 	}
@@ -21,14 +22,15 @@ func (cn *Conn) SetWriteTimeout(timeout time.Duration) {
 }
 
 func (cn *Conn) SetReadTimeout(timeout time.Duration) {
+	cn.UpdateLastUseTime(time.Now())
 	if timeout <= 0 {
 		cn.NetConn.SetReadDeadline(noTimeout)
 	}
 	cn.NetConn.SetReadDeadline(time.Now().Add(timeout))
 }
 
-func (cn *Conn) UpdateLastUseTime() {
-	cn.lastUseTime.Store(time.Now())
+func (cn *Conn) UpdateLastUseTime(time time.Time) {
+	cn.lastUseTime.Store(time)
 }
 
 func (cn *Conn) IsExpired(timeout time.Duration) bool {

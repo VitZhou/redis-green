@@ -4,6 +4,7 @@ import "testing"
 import (
 	"github.com/stretchr/testify/assert"
 	"net"
+	"time"
 )
 
 func TestNewConnPool(t *testing.T) {
@@ -154,5 +155,23 @@ func TestConnPool_CloseConn(t *testing.T) {
 		_ = connPool.Close()
 		e := connPool.CloseConn(conn)
 		assert.Error(t, e, AlreadyClosed)
+	})
+}
+
+func TestConnPool_CheckIdle(t *testing.T) {
+	t.Run("超时", func(t *testing.T) {
+		opt := &Options{Address: ":8080", dialer: func() (net.Conn, error) {
+			_, conn := net.Pipe()
+			return conn, nil
+		}, MaxPoolSize: 1,
+			IdleTimeout: 1 * time.Second}
+		connPool, _ := NewConnPool(opt)
+		conn, _ := connPool.Get()
+		conn.UpdateLastUseTime(time.Now().Add(-1 * time.Second))
+		connPool.checkIdle()
+		size := connPool.size()
+		if size != 0{
+			t.Error("fail")
+		}
 	})
 }
